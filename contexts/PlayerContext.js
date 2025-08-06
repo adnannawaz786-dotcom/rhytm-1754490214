@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 
 const PlayerContext = createContext()
 
@@ -8,70 +8,70 @@ const mockPlaylist = [
     title: 'Midnight Dreams',
     artist: 'Luna Wave',
     duration: '3:45',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 2,
     title: 'Electric Pulse',
     artist: 'Neon Lights',
     duration: '4:12',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 3,
     title: 'Ocean Breeze',
     artist: 'Coastal Sound',
     duration: '3:28',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 4,
     title: 'City Nights',
     artist: 'Urban Echo',
     duration: '4:01',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 5,
     title: 'Starlight',
     artist: 'Cosmic Vibes',
     duration: '3:56',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 6,
     title: 'Thunder Storm',
     artist: 'Nature Sounds',
     duration: '5:23',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 7,
     title: 'Golden Hour',
     artist: 'Sunset Collective',
     duration: '3:33',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 8,
     title: 'Digital Love',
     artist: 'Synth Masters',
     duration: '4:18',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 9,
     title: 'Mountain High',
     artist: 'Alpine Echoes',
     duration: '4:45',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   },
   {
     id: 10,
     title: 'Neon Nights',
     artist: 'Retro Future',
     duration: '3:52',
-    url: ''
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
   }
 ]
 
@@ -83,52 +83,126 @@ export function PlayerProvider({ children }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [currentIndex, setCurrentIndex] = useState(-1)
+  const audioRef = useRef(null)
 
-  // Simulate audio progress
+  // Initialize audio element
   useEffect(() => {
-    let interval
-    if (isPlaying && currentTrack) {
-      const trackDuration = parseDuration(currentTrack.duration)
-      setDuration(trackDuration)
-      
-      interval = setInterval(() => {
-        setCurrentTime(prev => {
-          if (prev >= trackDuration - 1) {
-            nextTrack()
-            return 0
-          }
-          return prev + 1
-        })
-      }, 1000)
+    audioRef.current = new Audio()
+    const audio = audioRef.current
+
+    // Audio event listeners
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime)
     }
-    return () => clearInterval(interval)
+
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration)
+    }
+
+    const handleEnded = () => {
+      nextTrack()
+    }
+
+    const handleCanPlay = () => {
+      if (isPlaying) {
+        audio.play().catch(console.error)
+      }
+    }
+
+    const handleError = (e) => {
+      console.error('Audio error:', e)
+      setIsPlaying(false)
+    }
+
+    audio.addEventListener('timeupdate', handleTimeUpdate)
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('canplay', handleCanPlay)
+    audio.addEventListener('error', handleError)
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate)
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('canplay', handleCanPlay)
+      audio.removeEventListener('error', handleError)
+      audio.pause()
+    }
+  }, [])
+
+  // Handle volume changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume / 100
+    }
+  }, [volume])
+
+  // Handle play/pause state changes
+  useEffect(() => {
+    if (audioRef.current && currentTrack) {
+      if (isPlaying) {
+        audioRef.current.play().catch((error) => {
+          console.error('Error playing audio:', error)
+          setIsPlaying(false)
+        })
+      } else {
+        audioRef.current.pause()
+      }
+    }
   }, [isPlaying, currentTrack])
 
-  const parseDuration = (durationStr) => {
-    const [minutes, seconds] = durationStr.split(':').map(Number)
-    return minutes * 60 + seconds
-  }
-
   const playTrack = (track) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    // Set the new track
     setCurrentTrack(track)
     setCurrentTime(0)
-    setIsPlaying(true)
+    
+    // Load the audio source
+    audio.src = track.url
+    audio.currentTime = 0
+    
+    // Find the index of the track
     const index = playlist.findIndex(t => t.id === track.id)
     setCurrentIndex(index)
+    
+    // Start playing
+    setIsPlaying(true)
   }
 
   const togglePlayPause = () => {
+    if (!currentTrack) {
+      // If no track is selected, play the first track
+      if (playlist.length > 0) {
+        playTrack(playlist[0])
+      }
+      return
+    }
+    
     setIsPlaying(!isPlaying)
   }
 
   const nextTrack = () => {
-    const nextIndex = (currentIndex + 1) % playlist.length
+    if (playlist.length === 0) return
+    
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % playlist.length : 0
     playTrack(playlist[nextIndex])
   }
 
   const previousTrack = () => {
-    const prevIndex = currentIndex === 0 ? playlist.length - 1 : currentIndex - 1
+    if (playlist.length === 0) return
+    
+    const prevIndex = currentIndex >= 0 ? 
+      (currentIndex === 0 ? playlist.length - 1 : currentIndex - 1) : 0
     playTrack(playlist[prevIndex])
+  }
+
+  const seekTo = (time) => {
+    if (audioRef.current && currentTrack) {
+      audioRef.current.currentTime = time
+      setCurrentTime(time)
+    }
   }
 
   const addToPlaylist = (track) => {
@@ -137,6 +211,13 @@ export function PlayerProvider({ children }) {
 
   const removeFromPlaylist = (trackId) => {
     setPlaylist(prev => prev.filter(t => t.id !== trackId))
+    
+    // If the current track is being removed, stop playback
+    if (currentTrack && currentTrack.id === trackId) {
+      setCurrentTrack(null)
+      setIsPlaying(false)
+      setCurrentIndex(-1)
+    }
   }
 
   const value = {
@@ -151,6 +232,7 @@ export function PlayerProvider({ children }) {
     togglePlayPause,
     nextTrack,
     previousTrack,
+    seekTo,
     setVolume,
     addToPlaylist,
     removeFromPlaylist

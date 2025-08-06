@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Play, Pause, SkipForward, SkipBack, ChevronUp, Heart } from 'lucide-react'
 import { usePlayer } from '../contexts/PlayerContext'
 import { Button } from './ui/button'
-import { Progress } from './ui/progress'
+import { Slider } from './ui/slider'
 
 export default function MiniPlayer() {
   const { 
@@ -13,13 +13,34 @@ export default function MiniPlayer() {
     nextTrack, 
     previousTrack,
     currentTime,
-    duration
+    duration,
+    seekTo
   } = usePlayer()
   const [isExpanded, setIsExpanded] = useState(false)
 
   if (!currentTrack) return null
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+
+  const formatTime = (time) => {
+    if (!time || isNaN(time)) return '0:00'
+    const minutes = Math.floor(time / 60)
+    const seconds = Math.floor(time % 60)
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  const handleProgressClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const width = rect.width
+    const clickPercent = clickX / width
+    const newTime = clickPercent * duration
+    seekTo(newTime)
+  }
+
+  const handleSliderChange = (value) => {
+    seekTo(value[0])
+  }
 
   return (
     <AnimatePresence>
@@ -34,7 +55,10 @@ export default function MiniPlayer() {
           layout
         >
           {/* Progress Bar */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-white/10">
+          <div 
+            className="absolute top-0 left-0 right-0 h-1 bg-white/10 cursor-pointer"
+            onClick={handleProgressClick}
+          >
             <motion.div 
               className="h-full bg-gradient-to-r from-blue-400 to-purple-500"
               initial={{ width: 0 }}
@@ -116,9 +140,18 @@ export default function MiniPlayer() {
                 transition={{ duration: 0.3 }}
                 className="mt-4 pt-4 border-t border-white/10"
               >
-                <div className="flex items-center justify-between text-white/70 text-sm mb-2">
-                  <span>{Math.floor(currentTime / 60)}:{(Math.floor(currentTime % 60)).toString().padStart(2, '0')}</span>
-                  <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}</span>
+                <div className="mb-3">
+                  <Slider
+                    value={[currentTime]}
+                    onValueChange={handleSliderChange}
+                    max={duration || 100}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex items-center justify-between text-white/70 text-sm mt-2">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(duration)}</span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-center space-x-6">
                   <Button 

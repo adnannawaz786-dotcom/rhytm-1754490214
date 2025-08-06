@@ -19,7 +19,8 @@ export default function Home() {
     volume,
     setVolume,
     currentTime,
-    duration
+    duration,
+    seekTo
   } = usePlayer()
   const [isLoading, setIsLoading] = useState(true)
 
@@ -33,9 +34,15 @@ export default function Home() {
   }
 
   const formatTime = (time) => {
+    if (!time || isNaN(time)) return '0:00'
     const minutes = Math.floor(time / 60)
     const seconds = Math.floor(time % 60)
     return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  const handleProgressChange = (value) => {
+    const newTime = value[0]
+    seekTo(newTime)
   }
 
   return (
@@ -70,7 +77,8 @@ export default function Home() {
           <div className="mb-4">
             <Slider
               value={[currentTime]}
-              max={duration}
+              onValueChange={handleProgressChange}
+              max={duration || 100}
               step={1}
               className="w-full"
             />
